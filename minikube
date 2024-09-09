@@ -1,0 +1,144 @@
+Hello codtech,my name is mohd zaki.my 4th task is that i have to create kubenetes cluster and deploy a containerization application on this kubernetes cluster.so that i have created 
+minikube cluser and deploy a containerization web application.i have done task 3 and task 3 is that i have to deploy containerization application here in 4th task i have extended 
+the work of task 3.i have taken same container on pods and deploy it on minikube cluster.so the followings has all the commands,docker file,manefestfile of docker and kubernetes.
+so first of all i have to create virtual machine as kubernetes server then i need to create a user and give him the root privillege because command and instruction not working with root user.
+useradd abhay (for creation of user)
+sudo usermod -aG wheel abhay (for adding the abhay user in default wheel group)
+sudo visudo  (for open the file sudo because it configuration file of root user so if we want to give privillege to ahay user as root user then we have wirte the follow in th last of the file)
+abhay ALL=(ALL) NOPASSWD:ALL (write in the last of the sudo file)
+su - abhay (for login as abhay user with full privillege as root user)
+now her we have to download docker and add this user in docker group.
+sudo yum install docker -y (for install docker)
+sudo systemctl start docker (for start docer)
+sudo systemctl enable docker (for enable docker)
+newgrp docker(for creating docker grup if not exist)
+sudo usermod -aG docker abhay (for adding ahbay in the docker)
+now we have to install kubectl for minikube cluster because we are unable to communicate with apiserver of minikube so followings command are for installing kubectl.
+curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+chmod +x ./kubectl
+sudo mv ./kubectl /usr/local/bin/kubectl (this commads is used for installing kubectl)
+kubectl version --client ( for check the version of kubectl)
+now after installing docker and kubectl we need to install minikube by executing follow commad.
+curl -LO https://storage.googleapis.com/minikube/releases/latest/minikube-linux-amd64
+sudo install minikube-linux-amd64 /usr/local/bin/minikube (with this we can installing minikube)
+minikube start --driver=docker  (for starting minikube cluster with docker but for this docker shoud be installed we can use other driver)
+minikube status  (for check the component of cluster is running or not like apiserver,kubectl,kubeconfig etc)
+now here our minikube cluster is ready now we will create docker image and push it to dockerhub then we will create manefestfiles for deployment pod and services.
+so first we have to get our three files for creating dockerimage in our virtual machine. 1st file is app.py it has python code of our web appication then 2nd one file is
+requirement.txt file which has packages which needs to create code as application an 3rd one is our dockerfile which will create our dockerimag and three files are follows
+first one app.py which is created by execute the command nano app.js
+from flask import Flask
+
+app = Flask(__name__)
+
+@app.route('/')
+def home():
+    return "Hello codtechteam, this is our application runnig on pods"
+
+if __name__ == "__main__":
+    app.run(host='0.0.0.0', port=5000)
+cntrl+x then y then enter (for save and exit from file editor)
+second file is requirement.txt which creates by execute the command nano requirement.txt
+Flask==2.2.3
+Werkzeug==2.0.3
+cntrl+X then y then entter (for  save and exit)
+thirdone is our dockerfile by command nano Dockerfile.
+# Use the official Python image from the Docker Hub
+FROM python:3.10-slim
+
+# Set the working directory in the container
+WORKDIR /usr/src/app
+
+# Copy the requirements file into the container
+COPY requirements.txt ./
+
+# Install any dependencies specified in requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy the rest of the application code into the container
+COPY . .
+
+# Expose port 5000 to the outside world
+EXPOSE 5000
+
+# Define the command to run the Flask application
+CMD ["python", "app.py"]
+cntrl+x then y then enter (for save and exit)
+here our all file which is required for our docker image  for web application is in our virtual machine now we have to execute the build and run command for docker image.
+docker build - t myzaki .  (command creating docker image)
+docker run -p 5000:5000 myzaki (command for run container on 5000 port)
+now we can see our web application running on docker container by using following url.
+http://virtualmachineip:5000 on google ( url of web appication on google or any browser)
+but here a disadvantage is that if docker container will be stoped or delete because of any unwanted issue then our web appication will not accessable for this docker container is easy for
+deployment of our web application but it is low availabilty.now to solve this issue we can create pod for container means our container is running on pods in cluster.and if pod is deleted 
+because  of unwanted issue then it will creates automatically so because of kubernetes tools with docker it will increaes high availability of our web application.
+for this we push our docker immage to dockerhub then write manifestfile for deployment pod with the help of our dockerimage.
+steps for push the dockerimage to dockerhub.and make sure you have an account on docker hub.first step is do login with dockerhub in the virtual machine.
+docker login (for login with dockerhub in the virtual machine)
+username:mohdzaki1
+password:********
+then tag your docker image with dockerhub.
+docker tag myzaki mohdzaki1/myzki (command for tag docker image with dockerhub)
+docker push myzaki (command for push dockerimage to dockerhub)
+our dockerimage is successfully pushed to our dockerhub. we can see the dockerimage on dockerhub.now here we can create manifestfile for deployment pod and service after writting this
+we can execute command for creating pod but i got imagepullback error in the status of pod issue so to solve this issue by imagePullSecret first we create dockerhub registry in virtualmahine
+and add instruction of imagepullsecret in manifestfile.
+kubectl create secret docker-registry my-registry-secret \
+  --docker-server=<DOCKER_SERVER_URL> \
+  --docker-username=<DOCKER_USERNAME> \
+  --docker-password=<DOCKER_PASSWORD> \
+  --docker-email=<DOCKER_EMAIL>  ( command for add dockerhub registry for imagepullsecret in the virtual machine)
+now we can create our manefestfile for deployment and servies.
+first we create a manifest file for deployment pod by execute command nano deployment.yaml.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: myzaki-deployment
+  labels:
+    app: myzaki
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: myzaki
+  template:
+    metadata:
+      labels:
+        app: myzaki
+    spec:
+      containers:
+      - name: myzaki
+        image: mohdzaki1/myzaki:latest 
+        ports:
+        - containerPort: 5000
+      imagePullSecrets:
+      - name: myregistrykey
+cntrl+x then y then enter (for save and exit )
+then create manifestfile for nodeport service by executing the command nano service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: myzaki-service
+spec:
+  type: nodeport
+  selector:
+    app: myzaki
+  ports:
+    - protocol: TCP
+      port: 80 
+      targetPort: 5000 
+cntrl+x then y then enter (for save and exit)
+now our manefest file is ready then execute the command for apply this manefestfile for creating pods.
+kubectl apply -f deployment.yaml  (commanf for creation of pods)
+kubectl apply -f service.yaml
+kubectl get pods   (for get the info od pods)
+kubectl get services    (for get the info services)
+minikube services myzaki-deployment ( for get info of minikube and url of our web app)
+curl http://ipofminikube:nodeport  (with this url we can see our web app is working or not) and my web application is working i have screenshot)
+here task is complited. thank you
+
+
+
+
+
+
